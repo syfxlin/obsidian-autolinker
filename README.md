@@ -1,45 +1,45 @@
-## Obsidian Sample Plugin
+# Obsidian AutoLinker
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+> 自动为 Obsidian 文档添加双向链接的插件
 
-This project uses Typescript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in Typescript Definition format, which contains TSDoc comments describing what it does.
+## 使用方式
 
-**Note:** The Obsidian API is still in early alpha and is subject to change at any time!
+本插件会自动寻找 Vault 内的所有 Markdown 文档，以及 Markdown 文档里的 `link_titles`
+FrontMatter，以这些作为链接，当有字段与文档名或 `link_titles` 指定的标题名匹配，则自动添加双向链接。样例如下：
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Changes the default font color to red using `styles.css`.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+文档名：三大特性.md
 
+```markdown
+---
+link_titles:
+  - 原子性
+  - 可见性
+  - 有序性
+---
 
-### Releasing new releases
+## 原子性
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments.
-- Publish the release.
+原子性指提供互斥访问，同一时刻只能有一个线程对数据进行操作（Atomic、CAS 算法、synchronized、Lock）。
 
-### Adding your plugin to the community plugin list
+三大特性
+```
 
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+选取要添加双向链接的区域，本样例为标题到结束，使用 `Ctrl+Alt+K` 自动添加双向链接
 
-### How to use
+```markdown
+---
+tags:
+  - Java
+  - 线程安全
+  - 并发 link_titles:
+  - 原子性
+  - 可见性
+  - 有序性
+---
 
-- Clone this repo.
-- `npm i` or `yarn` to install dependencies
-- `npm run dev` to start compilation in watch mode.
+## [[#原子性|原子性]]
 
-### Manually installing the plugin
+原子性指提供互斥访问，同一时刻只能有一个线程对数据进行操作（Atomic、CAS 算法、synchronized、Lock）。
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-### API Documentation
-
-See https://github.com/obsidianmd/obsidian-api
+[[三大特性]]
+```

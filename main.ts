@@ -1,112 +1,145 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { MarkdownView, Notice, Plugin } from "obsidian";
+import fm from "front-matter";
 
-interface MyPluginSettings {
-	mySetting: string;
+interface AutoLinkerSettings {
+  options: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+const DEFAULT_SETTINGS: AutoLinkerSettings = {
+  options: "{}",
+};
+
+interface FontMatterAttributes {
+  link_titles: string[] | undefined;
+  aliases: string[] | undefined;
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class AutoLinkerPlugin extends Plugin {
+  settings: AutoLinkerSettings;
 
-	async onload() {
-		console.log('loading plugin');
+  async onload() {
+    console.log("Loading AutoLinker");
 
-		await this.loadSettings();
+    await this.loadSettings();
 
-		this.addRibbonIcon('dice', 'Sample Plugin', () => {
-			new Notice('This is a notice!');
-		});
+    this.addCommand({
+      id: "autolinker-run",
+      name: "Run",
+      callback: () => this.runAutoLinker(),
+      hotkeys: [
+        {
+          modifiers: ["Mod", "Alt"],
+          key: "k",
+        },
+      ],
+    });
+  }
 
-		this.addStatusBarItem().setText('Status Bar Text');
+  onunload() {
+    console.log("Unloading AutoLinker");
+  }
 
-		this.addCommand({
-			id: 'open-sample-modal',
-			name: 'Open Sample Modal',
-			// callback: () => {
-			// 	console.log('Simple Callback');
-			// },
-			checkCallback: (checking: boolean) => {
-				let leaf = this.app.workspace.activeLeaf;
-				if (leaf) {
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-					return true;
-				}
-				return false;
-			}
-		});
+  async runAutoLinker() {
+    const view = this.app.workspace.activeLeaf.view;
+    if (view instanceof MarkdownView) {
+      // Do work here
+      const editor = view.sourceMode.cmEditor;
 
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+      // Remember the cursor
+      const cursor = editor.getCursor();
 
-		this.registerCodeMirror((cm: CodeMirror.Editor) => {
-			console.log('codemirror', cm);
-		});
+      const currentFile = this.app.workspace.getActiveFile();
+      let text = editor.getSelection();
+      if (!text) {
+        new Notice("AutoLinker: you must select text");
+        return;
+      }
 
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
+      try {
+        const markdownFiles = this.app.vault.getMarkdownFiles();
+        for (const markdownFile of markdownFiles) {
+          const name = markdownFile.basename;
+          text = this.findAndReplace(text, name);
+        }
+        const contents = await Promise.all(
+          markdownFiles.map((f) => this.app.vault.read(f))
+        );
+        for (let i = 0; i < contents.length; i++) {
+          const attributes: FontMatterAttributes = fm(contents[i])
+            .attributes as FontMatterAttributes;
+          if (attributes.aliases) {
+            for (const alias of attributes.aliases) {
+              text = this.findAndReplace(text, alias);
+            }
+          }
+          if (attributes.link_titles) {
+            for (const linkTitle of attributes.link_titles) {
+              let filePath;
+              if (markdownFiles[i].path === currentFile.path) {
+                filePath = "";
+              } else {
+                filePath = markdownFiles[i].basename;
+              }
+              text = this.findAndReplace(
+                text,
+                linkTitle,
+                filePath + "#" + linkTitle
+              );
+            }
+          }
+        }
+        new Notice("AutoLinker: linked");
+        editor.replaceSelection(text, "start");
+        editor.setCursor(cursor);
+      } catch (e) {
+        console.error(e);
+        if (e.message) {
+          new Notice(e.message);
+        }
+      }
+    }
+  }
 
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-	}
+  findAndReplace(text: string, name: string, link?: string) {
+    const index = text.indexOf(name);
+    if (index != -1) {
+      const length = name.length;
+      const leftOpenTag = text.substring(0, index).lastIndexOf("[[");
+      const leftCloseTag = text.substring(0, index).lastIndexOf("]]");
+      const rightOpenTag = text.indexOf("[[", index);
+      const rightCloseTag = text.indexOf("]]", index);
+      if (leftOpenTag !== -1 && rightCloseTag !== -1) {
+        if (leftOpenTag === -1 && rightCloseTag < rightOpenTag) {
+          return text;
+        }
+        if (rightOpenTag === -1 && leftCloseTag < leftOpenTag) {
+          return text;
+        }
+        if (leftCloseTag < leftOpenTag && rightCloseTag < rightOpenTag) {
+          return text;
+        }
+      }
+      let replace;
+      if (link) {
+        replace = link + "|" + text.substring(index, index + length);
+      } else {
+        replace = text.substring(index, index + length);
+      }
+      text =
+        text.substring(0, index) +
+        "[[" +
+        replace +
+        "]]" +
+        text.substring(index + length);
+    }
+    return text;
+  }
 
-	onunload() {
-		console.log('unloading plugin');
-	}
+  async loadSettings() {
+    this.settings = Object.assign(DEFAULT_SETTINGS, await this.loadData());
+  }
 
-	async loadSettings() {
-		this.settings = Object.assign(DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		let {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		let {containerEl} = this;
-
-		containerEl.empty();
-
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
-
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue('')
-				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
-	}
+  async saveSettings() {
+    await this.saveData(this.settings);
+  }
 }
