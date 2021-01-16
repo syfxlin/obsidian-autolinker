@@ -28,10 +28,7 @@ link_titles:
 
 ```markdown
 ---
-tags:
-  - Java
-  - 线程安全
-  - 并发 link_titles:
+link_titles:
   - 原子性
   - 可见性
   - 有序性
